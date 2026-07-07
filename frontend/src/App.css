@@ -1,6 +1,6 @@
 .App-header {
   background-color: #f0f0f0;
-  padding: 20px;
+  padding: 10px;
   text-align: center;
 }
 
@@ -64,4 +64,6 @@
   width: 100%;          /* put it on its own line */
   margin: 20px 0 0;
 }
+
+
 

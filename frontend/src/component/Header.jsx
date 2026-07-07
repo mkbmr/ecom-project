@@ -1,20 +1,30 @@
+import { Link } from 'react-router-dom'
+
 function Header() {
     return (
         <header className="App-header">
-            <nav>
+            <div className="Header-Message">
                 <p> COMPLEMENTARY PRIVATE ATELIER FITTING & GLOBAL WHITE-GLOVE SHIPPING</p>
-            </nav>
+            </div>
             <br />
             <hr />
             <br />
             <nav>
-                <a href="/#women">Women</a> | 
-                <a href="/#men">Men</a> |
-                <a href="/#collection"> The Collection</a> |
-                <a href="/">Maison Aura</a> | 
-                <a href="/login">Login</a> | 
-                <a href="/signup">Signup</a> | 
-                <a href="/dashboard">Dashboard</a> | 
+                <Link to="/shop/women"> Women </Link> |
+                <Link to="/shop/men"> Men </Link> |
+                <Link to="/shop/all"> The Collection </Link> |
+                
+                <Link to="/" className="maison-logo-svg-wrapper">
+                <svg width="240" height="60" viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <text x="120" y="28" fontFamily="'Cinzel', 'Didot', 'Playfair Display', serif" fontSize="20" fontWeight="400" fill="#111111" letterSpacing="6" textAnchor="middle">MAISON AURA</text>
+                    <line x1="40" y1="38" x2="200" y2="38" stroke="#d4af37" strokeWidth="1"/>
+                    <text x="120" y="50" fontFamily="'Helvetica Neue', Arial, sans-serif" fontSize="7" fontWeight="300" fill="#d4af37" letterSpacing="4" textAnchor="middle">HAUTE COUTURE</text>
+                </svg>
+                </Link>
+
+                <Link to="/login">Login </Link> |
+                <Link to="/register"> Signup </Link> |
+                <Link to="/dashboard"> Dashboard </Link> |
             </nav>
         </header>
     );

@@ -1,25 +1,26 @@
+import { Link } from "react-router-dom";
 function Footer() {
     return (
         <footer className="footer">
             <ul className="footer-col"> 
                 <li className="footer-title">COLLECTIONS</li> 
-                <li><a href="#">Mens's Collection</a></li> 
-                <li><a href="#">Womens's Collection</a></li> 
-                <li><a href="#">The Aterlier Collection</a></li>
+                <li><Link to="shop/men">Mens's Collection</Link></li> 
+                <li><Link to="shop/women">Womens's Collection</Link></li> 
+                <li><Link to="shop/all">The Collection</Link></li>
             </ul>  
 
             <ul className="footer-col"> 
                 <li className="footer-title">THE HOUSE</li> 
-                <li><a href="#">Our Heritage</a></li> 
-                <li><a href="#">Private Salons</a></li> 
-                <li><a href="#">Crasftmanship</a></li>
+                <li><Link to="/about">Our Heritage</Link></li> 
+                <li><Link to="#">Private Salons</Link></li> 
+                <li><Link to="#">Crasftsmanship</Link></li>
             </ul> 
 
             <ul className="footer-col"> 
                 <li className="footer-title">CONCIERGE</li> 
-                <li><a href="#">Contact Support</a></li> 
-                <li><a href="#">Delivery & Returns</a></li> 
-                <li><a href="#">Garment Care</a></li>
+                <li><Link to="/contact">Contact Support</Link></li> 
+                <li><Link to="#">Delivery & Returns</Link></li> 
+                <li><Link to="#">Garment Care</Link></li>
             </ul> 
 
             <ul className="footer-col"> 
