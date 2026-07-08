@@ -1,6 +1,17 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import Logo from './Logo'
+import { useCart } from '../pages/CartContext'
 
 function Header() {
+    const { cartCount, setIsCartOpen } = useCart()
+    const navigate = useNavigate()
+    const user = JSON.parse(localStorage.getItem('user'))
+
+    const handleLogout = () => {
+        localStorage.removeItem('user')
+        navigate('/login')
+    }
+
     return (
         <header className="App-header">
             <div className="Header-Message">
@@ -12,19 +23,27 @@ function Header() {
             <nav>
                 <Link to="/shop/women"> Women </Link> |
                 <Link to="/shop/men"> Men </Link> |
-                <Link to="/shop/all"> The Collection </Link> |
-                
-                <Link to="/" className="maison-logo-svg-wrapper">
-                <svg width="240" height="60" viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <text x="120" y="28" fontFamily="'Cinzel', 'Didot', 'Playfair Display', serif" fontSize="20" fontWeight="400" fill="#111111" letterSpacing="6" textAnchor="middle">MAISON AURA</text>
-                    <line x1="40" y1="38" x2="200" y2="38" stroke="#d4af37" strokeWidth="1"/>
-                    <text x="120" y="50" fontFamily="'Helvetica Neue', Arial, sans-serif" fontSize="7" fontWeight="300" fill="#d4af37" letterSpacing="4" textAnchor="middle">HAUTE COUTURE</text>
-                </svg>
+
+                <Link to="/shop/all" className="maison-logo-svg-wrapper">
+                <Logo />
                 </Link>
 
-                <Link to="/login">Login </Link> |
-                <Link to="/register"> Signup </Link> |
-                <Link to="/dashboard"> Dashboard </Link> |
+                {user ? (
+                    <>
+                        <span>Welcome, {user.fullName}</span> |
+                        <button onClick={handleLogout}>Log Out</button>
+                    </>
+                ) : (
+                    <>
+                        <Link to="/login">Login</Link> |
+                        <Link to="/register">Signup</Link>
+                        
+                    </>
+                )}
+
+                <button onClick={() => setIsCartOpen(true)}>
+                    Cart ({cartCount})
+                </button>
             </nav>
         </header>
     );

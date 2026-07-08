@@ -1,8 +1,9 @@
-import { useState, useSyncExternalStore} from 'react'
+import { useState } from 'react'
 import { useNavigate, Link} from 'react-router-dom';
 
 function MaisonRegister() {
     const navigate = useNavigate()
+
     // Declare variables
     const [formData, setFormData] = useState({
         fullName: '',
@@ -19,7 +20,7 @@ function MaisonRegister() {
         setFormData({...formData, [e.target.name]: e.target.value});
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
 
@@ -33,13 +34,37 @@ function MaisonRegister() {
             return
         }
 
-        
-        console.log('Registering with:', formData)
-        setSubmitted(true)
+        try {
+            const res = await fetch('http://localhost:5000/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fullName: formData.fullName,
+                    email: formData.email,
+                    password: formData.password,
+                    phone: formData.phone,
+                }),
+            })
 
-        setTimeout(() => {
-            navigate('/login')
-        },  2000)
+            const data = await res.json()
+
+            if (!res.ok) {
+                setError(data.error || 'Registration failed.')
+                return
+            }
+
+            setSubmitted(true)
+
+            setTimeout(() => {
+                navigate('/login')
+            },  2000)
+
+        } catch (err) {
+            console.error(err)
+            setError('Could not connect to server. Please try again.')
+        }
+
+
     } 
 
     return (

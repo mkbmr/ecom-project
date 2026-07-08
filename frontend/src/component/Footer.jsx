@@ -4,8 +4,8 @@ function Footer() {
         <footer className="footer">
             <ul className="footer-col"> 
                 <li className="footer-title">COLLECTIONS</li> 
-                <li><Link to="shop/men">Mens's Collection</Link></li> 
-                <li><Link to="shop/women">Womens's Collection</Link></li> 
+                <li><Link to="shop/men">Men's Collection</Link></li> 
+                <li><Link to="shop/women">Women's Collection</Link></li> 
                 <li><Link to="shop/all">The Collection</Link></li>
             </ul>  
 
