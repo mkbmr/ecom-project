@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Logo from '../component/Logo'
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function AdminDashboard() {
     const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState('overview')
@@ -41,7 +43,7 @@ function AdminDashboard() {
     const fetchProducts = async () => {
         setLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/products')
+            const res = await fetch(`${API_URL}/api/products`)
             const data = await res.json()
             setProducts(data)
         } catch (err) {
@@ -80,8 +82,8 @@ function AdminDashboard() {
         setFormError('')
 
         const url = editingId
-            ? `http://localhost:5000/api/products/${editingId}`
-            : 'http://localhost:5000/api/products'
+            ? `${API_URL}/api/products/${editingId}`
+            : `${API_URL}/api/products`
         const method = editingId ? 'PUT' : 'POST'
 
         try {
@@ -116,7 +118,7 @@ function AdminDashboard() {
         if (!confirmed) return
 
         try {
-            const res = await fetch(`http://localhost:5000/api/products/${id}`, {
+            const res = await fetch(`${API_URL}/api/products/${id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -141,7 +143,7 @@ const [newVariant, setNewVariant] = useState({ color: '', size: '', stock: '' })
 
 const fetchVariants = async (productId) => {
     try {
-        const res = await fetch(`http://localhost:5000/api/products/${productId}/variants`)
+        const res = await fetch(`${API_URL}/api/products/${productId}/variants`)
         const data = await res.json()
         setVariants(data)
     } catch (err) {
@@ -166,7 +168,7 @@ const handleNewVariantChange = (e) => {
 
 const handleAddVariant = async (productId) => {
     try {
-        const res = await fetch(`http://localhost:5000/api/products/${productId}/variants`, {
+        const res = await fetch(`${API_URL}/api/products/${productId}/variants`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -191,7 +193,7 @@ const handleAddVariant = async (productId) => {
 
 const handleUpdateVariantStock = async (variantId, newStock, productId) => {
     try {
-        const res = await fetch(`http://localhost:5000/api/variants/${variantId}`, {
+        const res = await fetch(`${API_URL}/api/variants/${variantId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -217,7 +219,7 @@ const handleDeleteVariant = async (variantId, productId) => {
     if (!confirmed) return
 
     try {
-        const res = await fetch(`http://localhost:5000/api/variants/${variantId}`, {
+        const res = await fetch(`${API_URL}/api/variants/${variantId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -233,6 +235,58 @@ const handleDeleteVariant = async (variantId, productId) => {
     } catch (err) {
         console.error(err)
         alert('Could not connect to server.')
+    }
+
+}
+
+const [customers, setCustomers] = useState([])
+const [customersLoading, setCustomersLoading] = useState(true)
+const [expandedCustomerId, setExpandedCustomerId] = useState(null)
+const [customerOrders, setCustomerOrders] = useState([])
+
+useEffect(() => {
+    if (activeTab === 'customers') {
+        fetchCustomers()
+    }
+}, [activeTab])
+
+const fetchCustomers = async () => {
+    setCustomersLoading(true)
+    try {
+        const res = await fetch(`${API_URL}/api/admin/customers`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        })
+        const data = await res.json()
+        setCustomers(data)
+    } catch (err) {
+        console.error(err)
+    }
+    setCustomersLoading(false)
+}
+
+const fetchCustomerOrders = async (customerId) => {
+    try {
+        const res = await fetch(`${API_URL}/api/admin/customers/${customerId}/orders`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        })
+        const data = await res.json()
+        setCustomerOrders(data)
+    } catch (err) {
+        console.error(err)
+    }
+}
+
+const handleToggleCustomer = (customerId) => {
+    if (expandedCustomerId === customerId) {
+        setExpandedCustomerId(null)
+        setCustomerOrders([])
+    } else {
+        setExpandedCustomerId(customerId)
+        fetchCustomerOrders(customerId)
     }
 }
 
@@ -396,7 +450,100 @@ const handleDeleteVariant = async (variantId, productId) => {
                     </div>
                 )}
 
-                {activeTab === 'customers' && <h1>Customers</h1>}
+                {activeTab === 'customers' && (
+    <div>
+        <h1>Customers ({customers.length})</h1>
+
+        {customersLoading ? (
+            <p>Loading...</p>
+        ) : (
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Total Orders</th>
+                        <th>Total Spend</th>
+                        <th>Last Order</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {customers.map((c) => (
+                        <>
+                            <tr key={c.id}>
+                                <td>{c.full_name}</td>
+                                <td>{c.email}</td>
+                                <td>{c.phone}</td>
+                                <td>{c.total_orders}</td>
+                                <td>${Number(c.total_spend).toFixed(2)}</td>
+                                <td>
+                                    {c.last_order
+                                        ? new Date(c.last_order).toLocaleDateString()
+                                        : 'No orders yet'}
+                                </td>
+                                <td>
+                                    <button onClick={() => handleToggleCustomer(c.id)}>
+                                        {expandedCustomerId === c.id ? 'Hide Orders' : 'View Orders'}
+                                    </button>
+                                </td>
+                            </tr>
+
+                            {expandedCustomerId === c.id && (
+                                <tr>
+                                    <td colSpan="7">
+                                        <div style={{ background: '#f5f5f5', padding: '1rem' }}>
+                                            <h4>Orders for {c.full_name}</h4>
+
+                                            {customerOrders.length === 0 ? (
+                                                <p>No orders yet.</p>
+                                            ) : (
+                                                customerOrders.map(order => (
+                                                    <div key={order.order_id} style={{ marginBottom: '1rem', borderBottom: '1px solid #ddd', paddingBottom: '1rem' }}>
+                                                        <p>
+                                                            <strong>Order #{order.order_id}</strong> —
+                                                            {new Date(order.created_at).toLocaleDateString()} —
+                                                            ${Number(order.total_amount).toFixed(2)} —
+                                                            <span>{order.status}</span>
+                                                        </p>
+
+                                                        <table>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Product</th>
+                                                                    <th>Color</th>
+                                                                    <th>Size</th>
+                                                                    <th>Qty</th>
+                                                                    <th>Price</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {order.items.map((item, index) => (
+                                                                    <tr key={index}>
+                                                                        <td>{item.product_name}</td>
+                                                                        <td>{item.color}</td>
+                                                                        <td>{item.size}</td>
+                                                                        <td>{item.quantity}</td>
+                                                                        <td>${Number(item.price).toFixed(2)}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </>
+                    ))}
+                </tbody>
+            </table>
+        )}
+    </div>
+)}
                 {activeTab === 'atelier' && <h1>Atelier</h1>}
             </main>
         </div>

@@ -11,7 +11,7 @@ function Collection() {
         const fetchProducts = async () => {
             setLoading(true)
             try {
-                const res = await fetch('http://localhost:5000/api/products')
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/products`)
                 const data = await res.json()
                 setProducts(data)
             } catch (err) {

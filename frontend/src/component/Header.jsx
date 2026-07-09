@@ -3,12 +3,14 @@ import Logo from './Logo'
 import { useCart } from '../pages/CartContext'
 
 function Header() {
-    const { cartCount, setIsCartOpen } = useCart()
+    const { cartCount, setIsCartOpen, clearCart } = useCart()
     const navigate = useNavigate()
     const user = JSON.parse(localStorage.getItem('user'))
 
     const handleLogout = () => {
+        clearCart()
         localStorage.removeItem('user')
+        localStorage.removeItem('token')
         navigate('/login')
     }
 

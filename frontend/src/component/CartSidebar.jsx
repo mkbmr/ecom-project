@@ -1,7 +1,65 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useCart } from '../pages/CartContext'
 
 function CartSidebar() {
-    const { cartItems, removeFromCart, updateQuantity, cartTotal, isCartOpen, setIsCartOpen } = useCart()
+    const { cartItems, removeFromCart, updateQuantity, clearCart, cartTotal, isCartOpen, setIsCartOpen } = useCart()
+
+    const navigate = useNavigate()
+    const [checkoutError, setCheckoutError] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handleCheckout = async () => {
+        setCheckoutError('')
+
+        const token = localStorage.getItem('token')
+
+        if (!token) {
+            setIsCartOpen(false)
+            navigate('/login?message=Please log in to check out.')
+            return
+        }
+
+        setLoading(true)
+
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    cartItems: cartItems.map(item => ({
+                        variantId: item.variantId,
+                        productId: item.productId,
+                        productName: item.productName,
+                        color: item.color,
+                        size: item.size,
+                        price: item.price,
+                        quantity: item.quantity,
+                    }))
+                }),
+            })
+
+            const data = await res.json()
+
+            if (!res.ok) {
+                setCheckoutError(data.error || 'Checkout failed.')
+                setLoading(false)
+                return
+            }
+
+            clearCart()
+            setIsCartOpen(false)
+            navigate(`/checkout-success?orderId=${data.orderId}`)
+
+        } catch (err) {
+            console.error(err)
+            setCheckoutError('Could not connect to server.')
+            setLoading(false)
+        }
+    }
 
     if (!isCartOpen) return null
 
@@ -35,7 +93,12 @@ function CartSidebar() {
                     ))}
 
                     <h3>Total: ${cartTotal.toFixed(2)}</h3>
-                    <button>Checkout</button>
+                    
+                    {checkoutError && <p style={{ color: 'red' }}>{checkoutError}</p>}
+
+                    <button onClick={handleCheckout} disabled={loading}>
+                        {loading ? 'Processing...' : 'Checkout'}
+                    </button>
                 </>
             )}
         </div>

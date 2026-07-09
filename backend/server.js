@@ -4,8 +4,27 @@ const bcrypt = require('bcrypt')
 const pool = require('./db')
 const jwt = require('jsonwebtoken')
 const app = express()
-app.use(cors())
+app.use(cors({ origin: process.env.CORS_ORIGIN }))
 app.use(express.json())
+
+// Middleware requiring a logged-in customer (any role)
+function requireAuth(req, res, next) {
+    const authHeader = req.headers.authorization
+
+    if (!authHeader) {
+        return res.status(401).json({ error: 'You must be logged in to do that.' })
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        req.user = decoded
+        next()
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token.' })
+    }
+}
 
 // --- Middleware ---
 function verifyAdmin(req, res, next) {
@@ -296,4 +315,131 @@ app.delete('/api/variants/:variantId', verifyAdmin, async (req, res) => {
     }
 })
 
-app.listen(5000, () => console.log('Server running on http://localhost:5000'))
+// Checkout, Orders and reduce stocks
+app.post('/api/checkout', requireAuth, async (req, res) => {
+    const { cartItems } = req.body
+    const user = req.user
+
+    const client = await pool.connect()
+
+    try {
+        await client.query('BEGIN')
+
+        // 1. Calculate total
+        const totalAmount = cartItems.reduce((sum, item) => 
+            sum + (item.price * item.quantity), 0
+        )
+
+        // 2. Create the order
+        const orderResult = await client.query(
+            `INSERT INTO orders (user_id, total_amount, status)
+             VALUES ($1, $2, 'pending')
+             RETURNING *`,
+            [user?.id || null, totalAmount]
+        )
+        const order = orderResult.rows[0]
+
+        // 3. Create order items + reduce stock
+        for (const item of cartItems) {
+            // Insert order item
+            await client.query(
+                `INSERT INTO order_items 
+                 (order_id, product_id, variant_id, product_name, color, size, price, quantity)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [order.id, item.productId, item.variantId, item.productName,
+                 item.color, item.size, item.price, item.quantity]
+            )
+
+            // Reduce stock
+            const stockCheck = await client.query(
+                'SELECT stock FROM product_variants WHERE id = $1',
+                [item.variantId]
+            )
+
+            const currentStock = stockCheck.rows[0]?.stock
+            if (currentStock < item.quantity) {
+                throw new Error(`Insufficient stock for ${item.productName} (${item.color}, ${item.size})`)
+            }
+
+            await client.query(
+                'UPDATE product_variants SET stock = stock - $1 WHERE id = $2',
+                [item.quantity, item.variantId]
+            )
+        }
+
+        await client.query('COMMIT')
+
+        res.status(201).json({ 
+            message: 'Order placed successfully.',
+            orderId: order.id
+        })
+
+    } catch (err) {
+        await client.query('ROLLBACK')
+        console.error(err)
+        res.status(400).json({ error: err.message || 'Checkout failed.' })
+    } finally {
+        client.release()
+    }
+})
+
+// Get Customers spending data
+app.get('/api/admin/customers', verifyAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                u.id,
+                u.full_name,
+                u.email,
+                u.phone,
+                u.created_at,
+                COUNT(o.id) AS total_orders,
+                COALESCE(SUM(o.total_amount), 0) AS total_spend,
+                MAX(o.created_at) AS last_order
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.id
+            WHERE u.role = 'customer'
+            GROUP BY u.id
+            ORDER BY total_spend DESC
+        `)
+        res.json(result.rows)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch customers.' })
+    }
+})
+
+// Customer fetching own order history
+app.get('/api/admin/customers/:id/orders', verifyAdmin, async (req, res) => {
+    const { id } = req.params
+
+    try {
+        const result = await pool.query(`
+            SELECT 
+                o.id AS order_id,
+                o.created_at,
+                o.total_amount,
+                o.status,
+                json_agg(json_build_object(
+                    'product_name', oi.product_name,
+                    'color', oi.color,
+                    'size', oi.size,
+                    'quantity', oi.quantity,
+                    'price', oi.price
+                )) AS items
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            WHERE o.user_id = $1
+            GROUP BY o.id
+            ORDER BY o.created_at DESC
+        `,
+        [id])
+        res.json(result.rows)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch orders.' })
+    }
+})
+
+const PORT = process.env.PORT || 5000
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`))
