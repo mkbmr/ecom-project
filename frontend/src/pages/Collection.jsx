@@ -33,19 +33,24 @@ function Collection() {
 
     return (
         <div className="collection-page">
-            <h1>{title}</h1>
+            <div className="collection-header">
+                <h1>{title}</h1>
+                <div className="collection-divider" />
+            </div>
 
             {loading ? (
                 <p>Loading...</p>
             ) : (
                 <div className="grid">
                     {filtered.map(p => (
-                        <Link to={`/product/${p.id}`} key={p.id} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <Link to={`/product/${p.id}`} key={p.id} className="product-card-link">
                             <div className="product-card">
-                                <img src={p.image_url} alt={p.product_name} width="150" />
+                                <div className="product-card-image">
+                                    <img src={p.image_url} alt={p.product_name} />
+                                </div>
                                 <h3>{p.product_name}</h3>
-                                <p>{p.type}</p>
-                                <p>${Number(p.price).toFixed(2)}</p>
+                                <p className="product-card-type">{p.type}</p>
+                                <p className="product-card-price">${Number(p.price).toFixed(2)}</p>
                             </div>
                         </Link>
                     ))}

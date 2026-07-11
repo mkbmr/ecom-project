@@ -4,13 +4,16 @@ function MaisonAbout() {
   return (
     <div className="about-page">
       <section className="about-hero">
-        <h5 className="about-established">Established 2026</h5>
-        <h3 className="about-headline">Silhouettes of Absolute Intent</h3>
+        <div className="about-hero-text">
+          <h5 className="about-established">Established 2026</h5>
+          <h3 className="about-headline">Silhouettes of Absolute Intent.</h3>
+        </div>
         <img className="about-hero-image" src="/About.jpg" alt="Italian Trulli" />
       </section>
 
       <section className="about-philosophy">
-        <h5 className="about-subtitle">OUR PHILOSOPHY</h5>
+        <h3 className="about-subtitle">Our Philosophy</h3>
+        <div className="about-divider" />
         <p className="about-text">
           At Maison Aura, a suit is never merely stitched; it is engineered.
           In our private atelier, every silhouette is honed through tradition and modern precision.
@@ -19,7 +22,7 @@ function MaisonAbout() {
         </p>
 
         <Link to="/shop/all" className="btn-return">
-          RETURN TO THE COLLECTION
+          Return to the Collections
         </Link>
       </section>
     </div>

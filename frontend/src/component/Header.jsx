@@ -15,37 +15,37 @@ function Header() {
     }
 
     return (
-        <header className="App-header">
-            <div className="Header-Message">
-                <p> COMPLEMENTARY PRIVATE ATELIER FITTING & GLOBAL WHITE-GLOVE SHIPPING</p>
+        <header>
+            <div className="header-announcement">
+                <p>COMPLIMENTARY PRIVATE ATELIER FITTING &amp; GLOBAL WHITE-GLOVE SHIPPING</p>
             </div>
-            <br />
-            <hr />
-            <br />
-            <nav>
-                <Link to="/shop/women"> Women </Link> |
-                <Link to="/shop/men"> Men </Link> |
 
-                <Link to="/shop/all" className="maison-logo-svg-wrapper">
-                <Logo />
+            <nav className="header-nav">
+                <div className="header-nav-left">
+                    <Link to="/shop/women">Women</Link>
+                    <Link to="/shop/men">Men</Link>
+                    <Link to="/shop/all">The Collections</Link>
+                </div>
+
+                <Link to="/shop/all" className="header-logo">
+                    <Logo />
                 </Link>
 
-                {user ? (
-                    <>
-                        <span>Welcome, {user.fullName}</span> |
-                        <button onClick={handleLogout}>Log Out</button>
-                    </>
-                ) : (
-                    <>
-                        <Link to="/login">Login</Link> |
-                        <Link to="/register">Signup</Link>
-                        
-                    </>
-                )}
+                <div className="header-nav-right">
+                    {user?.role === 'admin' && (
+                        <Link to="/dashboard" className="header-admin-link">Admin Dashboard</Link>
+                    )}
 
-                <button onClick={() => setIsCartOpen(true)}>
-                    Cart ({cartCount})
-                </button>
+                    {user ? (
+                        <button className="header-text-btn" onClick={handleLogout}>Log Out</button>
+                    ) : (
+                        <Link to="/login" className="header-text-btn">Sign In</Link>
+                    )}
+
+                    <button className="header-bag-btn" onClick={() => setIsCartOpen(true)}>
+                        Bag ({cartCount})
+                    </button>
+                </div>
             </nav>
         </header>
     );

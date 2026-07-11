@@ -3,6 +3,7 @@ node_modules/
 
 # Environment variables (contains DB passwords, secrets)
 .env*
+seed.sql*
 
 # Build output
 dist/

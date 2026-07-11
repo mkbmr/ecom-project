@@ -4,16 +4,16 @@ function Footer() {
         <footer className="footer">
             <ul className="footer-col"> 
                 <li className="footer-title">COLLECTIONS</li> 
-                <li><Link to="shop/men">Men's Collection</Link></li> 
-                <li><Link to="shop/women">Women's Collection</Link></li> 
-                <li><Link to="shop/all">The Collection</Link></li>
+                <li><Link to="shop/men">Men's Ready-To-Wear</Link></li>
+                <li><Link to="shop/women">Women's Tailoring</Link></li>
+                <li><Link to="shop/all">The Atelier Collection</Link></li>
             </ul>  
 
             <ul className="footer-col"> 
                 <li className="footer-title">THE HOUSE</li> 
                 <li><Link to="/about">Our Heritage</Link></li> 
                 <li><Link to="#">Private Salons</Link></li> 
-                <li><Link to="#">Crasftsmanship</Link></li>
+                <li><Link to="#">Craftsmanship</Link></li>
             </ul> 
 
             <ul className="footer-col"> 
@@ -24,10 +24,10 @@ function Footer() {
             </ul> 
 
             <ul className="footer-col"> 
-                <li className="footer-title">OPENING HOURS</li> 
-                <li>Monday - Friday: 10am - 9pm</li> 
-                <li>Saturday: 10am - 6pm</li> 
-                <li>Sunday: 11pm - 5pm</li>
+                <li className="footer-title">ATELIER HOURS</li>
+                <li>Mon — Fri 10:00 — 21:00</li>
+                <li>Saturday 10:00 — 18:00</li>
+                <li>Sunday 11:00 — 17:00</li>
             </ul> 
 
         <div className="footer-divider" />

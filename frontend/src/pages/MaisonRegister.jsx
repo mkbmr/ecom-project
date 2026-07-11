@@ -9,8 +9,8 @@ function MaisonRegister() {
         fullName: '',
         email: '',
         password: '',
-        confirmPassword: '',        
-        phone: '',        
+        confirmPassword: '',
+        phone: '',
     });
 
     const [error, setError] = useState('');
@@ -65,83 +65,78 @@ function MaisonRegister() {
         }
 
 
-    } 
+    }
 
     return (
-    <div className="maison-register-page">
-        <h1>An invitation</h1>
-        <h5>Welcome to the House</h5>
-        <p>Register to unlock private collection previews, seasonal lookbooks, and priority atelier scheduling.</p>
+    <div className="auth-page">
+        <div className="auth-card">
+            <p className="auth-eyebrow">MAISON AURA</p>
+            <h1 className="auth-title">An Invitation</h1>
+            <p className="auth-subtitle">Welcome to the House</p>
+            <div className="auth-divider" />
+            <p className="auth-intro">Register to unlock private collection previews, seasonal lookbooks, and priority atelier scheduling.</p>
 
-        <form onSubmit={handleSubmit}>
+            <form className="auth-form" onSubmit={handleSubmit}>
+                {error && <p className="auth-error">{error}</p>}
+                {submitted && <p className="auth-success">Account successfully created! Redirecting to Login Page</p>}
 
-        <label>
-            Full Name:
-            <input 
-            name="fullName" 
-            className="lux-input" 
-            type="text" 
-            value={formData.fullName} 
-            onChange={handleChange} 
-            placeholder="John Doe" required />
-        </label>
-        <br />
+                <div className="auth-field">
+                    <label>Full Name</label>
+                    <input
+                        name="fullName"
+                        type="text"
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        placeholder="John Doe" required />
+                </div>
 
-        <label>
-            Email:
-            <input 
-            name="email" 
-            className="lux-input" 
-            type="email" 
-            value={formData.email} 
-            onChange={handleChange} 
-            placeholder="name@email.com" required />
-        </label>
-        <br />
+                <div className="auth-field">
+                    <label>Email</label>
+                    <input
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="name@email.com" required />
+                </div>
 
-        <label>
-            Password:
-            <input 
-            name="password" 
-            className="lux-input" 
-            type="password" 
-            value={formData.password} 
-            onChange={handleChange} 
-            placeholder="Enter a password" required />
-        </label>
-        <br />
+                <div className="auth-field">
+                    <label>Password</label>
+                    <input
+                        name="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        placeholder="Enter a password" required />
+                </div>
 
-        <label>
-            Confirm Password:
-            <input 
-            name="confirmPassword" 
-            className="lux-input" 
-            type="password" 
-            value={formData.confirmPassword} 
-            onChange={handleChange} 
-            placeholder="Confirm password" required />
-        </label>
+                <div className="auth-field">
+                    <label>Confirm Password</label>
+                    <input
+                        name="confirmPassword"
+                        type="password"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        placeholder="Confirm password" required />
+                </div>
 
-        <br />
+                <div className="auth-field">
+                    <label>Phone Number</label>
+                    <input
+                        name="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="+6512345678" required />
+                </div>
 
-        <label>
-            Phone Number:
-            <input 
-            name="phone" 
-            className="lux-input" 
-            type="tel" 
-            value={formData.phone} 
-            onChange={handleChange} 
-            placeholder="+6512345678" required />
-        </label>
-        <br />
+                <button type="submit" className="auth-submit-btn">Request Entry</button>
+            </form>
 
-        <button 
-        type="submit" 
-        className="maison-login-btn">Request Entry</button>
-                    {error && <p style={{ color: 'red' }}>{error}</p>}
-                    {submitted && <p style={{ color: 'black' }}>{"Account successfully created! Redirecting to Login Page"}</p>}
-        </form>
+            <div className="auth-links">
+                <p>Already have an account? <Link to="/login">Log in here</Link></p>
+            </div>
+        </div>
     </div>
     )
 }

@@ -5,12 +5,12 @@ function MaisonLogin() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const redirectMessage = searchParams.get('message')
-    
+
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
-    
-    
+
+
     // Backend API here
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -41,7 +41,7 @@ function MaisonLogin() {
             } else {
                 navigate('/shop/all')
             }
-            
+
         } catch (err) {
             console.error(err)
             setError('Could not connect to server. Please try again.')
@@ -49,39 +49,43 @@ function MaisonLogin() {
     }
 
     return (
-    <div className="maison-login-page">
-        <h1>Log in to Your Account</h1>
-        <h5>Welcome back to Maison Aura</h5>
+    <div className="auth-page">
+        <div className="auth-card">
+            <p className="auth-eyebrow">MAISON AURA</p>
+            <h1 className="auth-title">Log In</h1>
+            <p className="auth-subtitle">Welcome back to Maison Aura</p>
+            <div className="auth-divider" />
 
-        <form onSubmit={handleSubmit}>
-                {redirectMessage && <p style={{ color: 'orange' }}>{redirectMessage}</p>}
-                {error && <p style={{ color: 'red' }}>{error}</p>}
-        <label>
-            Username:
-            <input 
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}     
-            />
-        </label>
-        <br />
+            <form className="auth-form" onSubmit={handleSubmit}>
+                {redirectMessage && <p className="auth-notice">{redirectMessage}</p>}
+                {error && <p className="auth-error">{error}</p>}
 
-        <label>
-            Password:
-            <input 
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-            />
-        </label>
-        <br />
+                <div className="auth-field">
+                    <label>Username</label>
+                    <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                    />
+                </div>
 
-        <button type="submit">Log In</button>
+                <div className="auth-field">
+                    <label>Password</label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                </div>
 
+                <button type="submit" className="auth-submit-btn">Log In</button>
+            </form>
 
-        <h5>New to the House? <Link to="/register"> Register here</Link> </h5>
-        <h5> <Link to="#">Forget Password?</Link> </h5>
-        </form>
+            <div className="auth-links">
+                <p>New to the House? <Link to="/register">Register here</Link></p>
+                <p><Link to="#">Forgot Password?</Link></p>
+            </div>
+        </div>
     </div>
     )
 }

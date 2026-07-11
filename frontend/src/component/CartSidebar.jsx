@@ -64,44 +64,62 @@ function CartSidebar() {
     if (!isCartOpen) return null
 
     return (
-        <div style={{
-            position: 'fixed', top: 0, right: 0, width: '350px', height: '100vh',
-            background: 'white', boxShadow: '-2px 0 8px rgba(0,0,0,0.15)',
-            padding: '1.5rem', overflowY: 'auto', zIndex: 1000
-        }}>
-            <button onClick={() => setIsCartOpen(false)}>Close</button>
-            <h2>Your Cart</h2>
+        <>
+            <div className="cart-overlay" onClick={() => setIsCartOpen(false)} />
 
-            {cartItems.length === 0 ? (
-                <p>Your cart is empty.</p>
-            ) : (
-                <>
-                    {cartItems.map(item => (
-                        <div key={item.variantId} style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0' }}>
-                            <p>{item.productName}</p>
-                            <p>{item.color} / {item.size}</p>
-                            <p>${item.price.toFixed(2)}</p>
-                            <input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateQuantity(item.variantId, Number(e.target.value))}
-                                style={{ width: '50px' }}
-                            />
-                            <button onClick={() => removeFromCart(item.variantId)}>Remove</button>
+            <div className="cart-sidebar">
+                <div className="cart-header">
+                    <h2>Your Bag ({cartItems.length})</h2>
+                    <button className="cart-close-btn" onClick={() => setIsCartOpen(false)}>&times;</button>
+                </div>
+
+                {cartItems.length === 0 ? (
+                    <p className="cart-empty">Your bag is empty.</p>
+                ) : (
+                    <>
+                        <div className="cart-items">
+                            {cartItems.map(item => (
+                                <div key={item.variantId} className="cart-item">
+                                    <div className="cart-item-image">
+                                        <img src={item.image} alt={item.productName} />
+                                    </div>
+
+                                    <div className="cart-item-details">
+                                        <p className="cart-item-name">{item.productName}</p>
+                                        <p className="cart-item-meta">{item.color} / {item.size}</p>
+                                        <p className="cart-item-price">${item.price.toFixed(2)}</p>
+
+                                        <div className="cart-item-row">
+                                            <input
+                                                className="cart-item-qty"
+                                                type="number"
+                                                min="1"
+                                                value={item.quantity}
+                                                onChange={(e) => updateQuantity(item.variantId, Number(e.target.value))}
+                                            />
+                                            <button className="cart-item-remove" onClick={() => removeFromCart(item.variantId)}>Remove</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
 
-                    <h3>Total: ${cartTotal.toFixed(2)}</h3>
-                    
-                    {checkoutError && <p style={{ color: 'red' }}>{checkoutError}</p>}
+                        <div className="cart-footer">
+                            <div className="cart-subtotal">
+                                <span>Subtotal</span>
+                                <span>${cartTotal.toFixed(2)}</span>
+                            </div>
 
-                    <button onClick={handleCheckout} disabled={loading}>
-                        {loading ? 'Processing...' : 'Checkout'}
-                    </button>
-                </>
-            )}
-        </div>
+                            {checkoutError && <p className="cart-error">{checkoutError}</p>}
+
+                            <button className="cart-checkout-btn" onClick={handleCheckout} disabled={loading}>
+                                {loading ? 'Processing...' : 'Checkout'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </>
     )
 }
 export default CartSidebar

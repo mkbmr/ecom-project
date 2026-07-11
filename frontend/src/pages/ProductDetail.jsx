@@ -32,11 +32,11 @@ function MeasurementsTable({ category }) {
     if (!table) return null
 
     return (
-        <div>
-            <p>{table.eyebrow}</p>
-            <h3>{table.title}</h3>
+        <div className="measurements-wrapper">
+            <p className="measurements-eyebrow">{table.eyebrow}</p>
+            <h3 className="measurements-title">{table.title}</h3>
 
-            <table>
+            <table className="measurements-table">
                 <thead>
                     <tr>
                         {table.columns.map(col => (
@@ -118,61 +118,68 @@ function ProductDetail() {
 
     return (
         <div className="product-detail-page">
-            <div>
-                <img src={product.image_url} alt={product.product_name} width="200" />
+            <div className="product-detail-image">
+                <img src={product.image_url} alt={product.product_name} />
+            </div>
+
+            <div className="product-detail-info">
+                <p className="product-detail-type">{product.type}</p>
+                <h1>{product.product_name}</h1>
+                <p className="product-detail-price">${Number(product.price).toFixed(2)}</p>
+                <p className="product-detail-sku">SKU: {selectedVariant ? selectedVariant.variant_sku : product.sku}</p>
+
+                <p className="product-detail-desc">{product.descriptions}</p>
+
+                <div className="product-detail-divider" />
+
+                <div className="product-detail-field">
+                    <label>Color</label>
+                    <select
+                        value={selectedColor}
+                        onChange={(e) => {
+                            setSelectedColor(e.target.value)
+                            setSelectedSize('')
+                        }}
+                    >
+                        <option value="">Select a color</option>
+                        {availableColors.map(color => (
+                            <option key={color} value={color}>{color}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="product-detail-field">
+                    <label>Size</label>
+                    <select
+                        value={selectedSize}
+                        onChange={(e) => setSelectedSize(e.target.value)}
+                        disabled={!selectedColor}
+                    >
+                        <option value="">Select a size</option>
+                        {availableSizes.map(size => (
+                            <option key={size} value={size}>{size}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {selectedVariant && (
+                    <p className={`product-detail-stock ${selectedVariant.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
+                        {selectedVariant.stock > 0
+                            ? `${selectedVariant.stock} in stock`
+                            : 'Out of stock'}
+                    </p>
+                )}
+
+                <button
+                    className="product-detail-add-btn"
+                    disabled={!selectedVariant || selectedVariant.stock === 0}
+                    onClick={handleAddToCart}
+                >
+                    Add to Cart
+                </button>
+
                 <MeasurementsTable category={product.category} />
             </div>
-
-            <h1>{product.product_name}</h1>
-            <p>{product.type}</p>
-            <p>SKU: {selectedVariant ? selectedVariant.variant_sku : product.sku}</p>
-            <p>${Number(product.price).toFixed(2)}</p>
-            <p>{product.descriptions}</p>
-
-            <div>
-                <label>Color:</label>
-                <select
-                    value={selectedColor}
-                    onChange={(e) => {
-                        setSelectedColor(e.target.value)
-                        setSelectedSize('')
-                    }}
-                >
-                    <option value="">Select a color</option>
-                    {availableColors.map(color => (
-                        <option key={color} value={color}>{color}</option>
-                    ))}
-                </select>
-            </div>
-
-            <div>
-                <label>Size:</label>
-                <select
-                    value={selectedSize}
-                    onChange={(e) => setSelectedSize(e.target.value)}
-                    disabled={!selectedColor}
-                >
-                    <option value="">Select a size</option>
-                    {availableSizes.map(size => (
-                        <option key={size} value={size}>{size}</option>
-                    ))}
-                </select>
-            </div>
-
-            {selectedVariant && (
-                <p>
-                    {selectedVariant.stock > 0
-                        ? `${selectedVariant.stock} in stock`
-                        : 'Out of stock'}
-                </p>
-            )}
-
-            <button
-                disabled={!selectedVariant || selectedVariant.stock === 0}
-                onClick={handleAddToCart}
-            >
-                Add to Cart
-            </button>
         </div>
     )
 }

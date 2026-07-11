@@ -4,7 +4,10 @@ const bcrypt = require('bcrypt')
 const pool = require('./db')
 const jwt = require('jsonwebtoken')
 const app = express()
-app.use(cors({ origin: process.env.CORS_ORIGIN }))
+app.use(cors({
+    origin: ['http://localhost:5000', 'http://localhost:3000', 'http://localhost:5173'],
+    credentials: true
+}))
 app.use(express.json())
 
 // Middleware requiring a logged-in customer (any role)
@@ -440,6 +443,223 @@ app.get('/api/admin/customers/:id/orders', verifyAdmin, async (req, res) => {
         res.status(500).json({ error: 'Could not fetch orders.' })
     }
 })
+
+// Get all appointments
+app.get('/api/atelier', verifyAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT a.*, u.full_name, u.email, u.phone
+            FROM atelier_appointments a
+            LEFT JOIN users u ON u.id = a.user_id
+            ORDER BY a.created_at DESC
+        `)
+        res.json(result.rows)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch appointments.' })
+    }
+})
+
+// Update appointment status + admin message
+app.put('/api/atelier/:id', verifyAdmin, async (req, res) => {
+    const { id } = req.params
+    const { status, admin_message } = req.body
+
+    try {
+        const result = await pool.query(
+            `UPDATE atelier_appointments
+             SET status = $1, admin_message = $2
+             WHERE id = $3
+             RETURNING *`,
+            [status, admin_message, id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Appointment not found.' })
+        }
+
+        res.status(200).json(result.rows[0])
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not update appointment.' })
+    }
+})
+
+
+app.get('/api/admin/overview', verifyAdmin, async (req, res) => {
+    try {
+        const [
+            todayRevenue,
+            monthRevenue,
+            allTimeRevenue,
+            revenueChart,
+            ordersChart,
+            stockOverview,
+            atelierPending,
+            topSelling,
+            categorySplit,
+            recentOrders
+        ] = await Promise.all([
+
+            // Today's revenue
+            pool.query(`
+                SELECT COALESCE(SUM(total_amount), 0) AS revenue,
+                       COUNT(*) AS orders
+                FROM orders
+                WHERE DATE(created_at) = CURRENT_DATE
+                AND status != 'cancelled'
+            `),
+
+            // This month
+            pool.query(`
+                SELECT COALESCE(SUM(total_amount), 0) AS revenue,
+                       COUNT(*) AS orders
+                FROM orders
+                WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                AND status != 'cancelled'
+            `),
+
+            // All time
+            pool.query(`
+                SELECT COALESCE(SUM(total_amount), 0) AS revenue,
+                       COUNT(*) AS orders
+                FROM orders
+                WHERE status != 'cancelled'
+            `),
+
+            // Revenue chart
+            pool.query(`
+                SELECT DATE(created_at) AS date,
+                       COALESCE(SUM(total_amount), 0) AS revenue
+                FROM orders
+                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                AND status != 'cancelled'
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            `),
+
+            // Orders chart
+            pool.query(`
+                SELECT DATE(created_at) AS date,
+                       COUNT(*) AS orders
+                FROM orders
+                WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+                AND status != 'cancelled'
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            `),
+
+            // Stock overview
+            pool.query(`
+                SELECT
+                    COUNT(*) AS total_variants,
+                    SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+                    SUM(CASE WHEN stock > 0 AND stock <= 5 THEN 1 ELSE 0 END) AS low_stock
+                FROM product_variants
+            `),
+
+            // Atelier pending count
+            pool.query(`
+                SELECT COUNT(*) AS pending
+                FROM atelier_appointments
+                WHERE status = 'pending'
+            `),
+
+            // Top selling items
+            pool.query(`
+                SELECT
+                    oi.product_name,
+                    oi.color,
+                    oi.size,
+                    SUM(oi.quantity) AS units_sold,
+                    SUM(oi.price * oi.quantity) AS revenue
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.status != 'cancelled'
+                GROUP BY oi.product_name, oi.color, oi.size
+                ORDER BY units_sold DESC, revenue DESC
+                LIMIT 10
+            `),
+
+            // Category split (men vs women)
+            pool.query(`
+                SELECT
+                    p.category,
+                    COALESCE(SUM(oi.price * oi.quantity), 0) AS revenue,
+                    COUNT(DISTINCT o.id) AS orders
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                JOIN products p ON p.id = oi.product_id
+                WHERE o.status != 'cancelled'
+                GROUP BY p.category
+            `),
+
+            // Recent orders
+            pool.query(`
+                SELECT
+                    o.id,
+                    o.total_amount,
+                    o.status,
+                    o.created_at,
+                    u.full_name,
+                    u.email
+                FROM orders o
+                LEFT JOIN users u ON u.id = o.user_id
+                ORDER BY o.created_at DESC
+                LIMIT 5
+            `)
+        ])
+
+        res.json({
+            today: {
+                revenue: todayRevenue.rows[0].revenue,
+                orders: todayRevenue.rows[0].orders
+            },
+            month: {
+                revenue: monthRevenue.rows[0].revenue,
+                orders: monthRevenue.rows[0].orders
+            },
+            allTime: {
+                revenue: allTimeRevenue.rows[0].revenue,
+                orders: allTimeRevenue.rows[0].orders
+            },
+            revenueChart: revenueChart.rows,
+            ordersChart: ordersChart.rows,
+            stock: stockOverview.rows[0],
+            atelierPending: atelierPending.rows[0].pending,
+            topSelling: topSelling.rows,
+            categorySplit: categorySplit.rows,
+            recentOrders: recentOrders.rows
+        })
+
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch overview data.' })
+    }
+})
+
+app.get('/api/admin/stock', verifyAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                pv.id,
+                pv.color,
+                pv.size,
+                pv.stock,
+                pv.variant_sku AS sku,
+                p.product_name,
+                p.category
+            FROM product_variants pv
+            JOIN products p ON p.id = pv.product_id
+            ORDER BY pv.stock ASC
+        `)
+        res.json(result.rows)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch stock data.' })
+    }
+})
+
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`))
