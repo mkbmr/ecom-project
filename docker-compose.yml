@@ -1,17 +1,4 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: maison_aura_db
-    environment:
-      POSTGRES_USER: {DB_USER}
-      POSTGRES_PASSWORD: {DB_PASSWORD}
-      POSTGRES_DB: {DB_NAME}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
 
   backend:
     build: ./backend
@@ -33,5 +20,13 @@ services:
       - backend
     restart: unless-stopped
 
-volumes:
-  postgres_data:
+  stripe-cli:
+    image: stripe/strip-cli:latest
+    container_name: maison_aura_stripe
+    command: listen --forward-to localhost:5000/api/webhook
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_DEVICE_NAME: maison-aura-local
+    depends_on:
+    - backend
+    restart: unless-stopped

@@ -11,6 +11,7 @@ import MaisonSpecs from './pages/MaisonSpecs.jsx'
 import Collection from './pages/Collection.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import ProductDetail from './pages/ProductDetail.jsx'
+import OrderHistory from './pages/OrderHistory.jsx'
 import { CartProvider } from './pages/CartContext.jsx'
 
 import './App.css'
@@ -28,6 +29,7 @@ function App() {
             <Route path="/register" element={<MaisonRegister />} />
             <Route path="/login" element={<MaisonLogin />} />
             <Route path="/checkout-success" element={<CheckOut />} />
+            <Route path="/orders" element={<OrderHistory />} />
             <Route path="/contact" element={<ContactSupport />} />
             <Route path="/about" element={<MaisonAbout />} />
             <Route path="/configurator" element={<MaisonConfigurator />} />

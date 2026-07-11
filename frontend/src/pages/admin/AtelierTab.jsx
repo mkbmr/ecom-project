@@ -5,11 +5,13 @@ const API_URL = import.meta.env.VITE_API_URL
 function AtelierTab() {
     const [appointments, setAppointments] = useState([])
     const [appointmentsLoading, setAppointmentsLoading] = useState(true)
+    const [appointmentsError, setAppointmentsError] = useState('')
     const [managingId, setManagingId] = useState(null)
     const [manageForm, setManageForm] = useState({ status: '', admin_message: '' })
 
     const fetchAppointments = async () => {
         setAppointmentsLoading(true)
+        setAppointmentsError('')
         try {
             const res = await fetch(`${API_URL}/api/atelier`, {
                 headers: {
@@ -17,9 +19,18 @@ function AtelierTab() {
                 }
             })
             const data = await res.json()
+
+            if (!res.ok) {
+                setAppointmentsError(data.error || 'Could not load fitting requests.')
+                setAppointments([])
+                setAppointmentsLoading(false)
+                return
+            }
+
             setAppointments(data)
         } catch (err) {
             console.error(err)
+            setAppointmentsError('Could not connect to server.')
         }
         setAppointmentsLoading(false)
     }
@@ -82,6 +93,8 @@ function AtelierTab() {
             <div className="admin-card">
             {appointmentsLoading ? (
                 <p>Loading...</p>
+            ) : appointmentsError ? (
+                <p style={{ color: '#ef4444' }}>{appointmentsError}</p>
             ) : (
                 <table className="admin-table">
                     <thead>

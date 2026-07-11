@@ -37,7 +37,10 @@ function Header() {
                     )}
 
                     {user ? (
-                        <button className="header-text-btn" onClick={handleLogout}>Log Out</button>
+                        <>
+                            <Link to="/orders" className="header-text-btn">My Orders</Link>
+                            <button className="header-text-btn" onClick={handleLogout}>Log Out</button>
+                        </>
                     ) : (
                         <Link to="/login" className="header-text-btn">Sign In</Link>
                     )}

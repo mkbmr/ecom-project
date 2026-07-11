@@ -1,3 +1,5 @@
+require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const express = require('express')
 const cors = require('cors')
 const bcrypt = require('bcrypt')
@@ -5,9 +7,145 @@ const pool = require('./db')
 const jwt = require('jsonwebtoken')
 const app = express()
 app.use(cors({
-    origin: ['http://localhost:5000', 'http://localhost:3000', 'http://localhost:5173'],
+    origin: function(origin, callback) {
+        const allowed = [
+            'http://localhost',
+            'http://localhost:3000',
+            'http://localhost:5173',
+            process.env.CORS_ORIGIN
+        ]
+        if (!origin || allowed.includes(origin)) {
+            callback(null, true)
+        } else {
+            callback(new Error('Not allowed by CORS'))
+        }
+    },
     credentials: true
 }))
+
+app.post('/api/webhook',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+        const sig = req.headers['stripe-signature']
+        let event
+
+        try {
+            event = stripe.webhooks.constructEvent(
+                req.body,
+                sig,
+                process.env.STRIPE_WEBHOOK_SECRET
+            )
+        } catch (err) {
+            console.error('Webhook error:', err.message)
+            return res.status(400).send(`Webhook Error: ${err.message}`)
+        }
+
+        if (event.type === 'payment_intent.succeeded') {
+            const paymentIntent = event.data.object
+            const cartItems = JSON.parse(paymentIntent.metadata.cartItems)
+            const userId = paymentIntent.metadata.userId || null
+            const totalAmount = paymentIntent.amount / 100
+
+            const client = await pool.connect()
+
+            try {
+                await client.query('BEGIN')
+
+                const orderResult = await client.query(
+                    `INSERT INTO orders (user_id, total_amount, status)
+                     VALUES ($1, $2, 'completed')
+                     RETURNING *`,
+                    [userId, totalAmount]
+                )
+                const order = orderResult.rows[0]
+
+                let userContact = null
+                if (userId) {
+                    const userResult = await client.query(
+                        'SELECT full_name, email, phone FROM users WHERE id = $1',
+                        [userId]
+                    )
+                    userContact = userResult.rows[0] || null
+                }
+
+                for (const item of cartItems) {
+                    await client.query(
+                        `INSERT INTO order_items
+                         (order_id, product_id, variant_id, product_name, color, size, price, quantity)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        [order.id, item.productId, item.variantId, item.productName,
+                         item.color, item.size, item.price, item.quantity]
+                    )
+
+                    if (item.size === 'Atelier Fitting' && userContact) {
+                        await client.query(
+                            `INSERT INTO atelier_appointments
+                             (user_id, full_name, email, phone, product_name, cut, color, notes)
+                             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                            [userId, userContact.full_name, userContact.email, userContact.phone,
+                             item.productName, null, item.color, `Requested via checkout — Order #${order.id}`]
+                        )
+                    }
+
+                    const stockCheck = await client.query(
+                        'SELECT stock FROM product_variants WHERE id = $1',
+                        [item.variantId]
+                    )
+
+                    if (stockCheck.rows[0].stock < item.quantity) {
+                        throw new Error(`Insufficient stock for ${item.productName}`)
+                    }
+
+                    await client.query(
+                        'UPDATE product_variants SET stock = stock - $1 WHERE id = $2',
+                        [item.quantity, item.variantId]
+                    )
+                }
+
+                await client.query('COMMIT')
+                console.log(`Order ${order.id} created successfully`)
+
+            } catch (err) {
+                await client.query('ROLLBACK')
+                console.error('Order creation failed:', err)
+            } finally {
+                client.release()
+            }
+        }
+
+        res.json({ received: true })
+    }
+)
+
+app.post('/api/create-payment-intent', express.json(), requireAuth, async (req, res) => {
+    const { cartItems } = req.body
+    const userId = req.user?.id
+
+    try {
+        const totalAmount = cartItems.reduce((sum, item) =>
+            sum + Math.round(item.price * item.quantity * 100), 0
+        )
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: totalAmount,
+            currency: 'sgd',
+            metadata: {
+                cartItems: JSON.stringify(cartItems),
+                userId: userId ? String(userId) : ''
+            }
+        })
+
+        res.json({
+            clientSecret: paymentIntent.client_secret,
+            totalAmount: totalAmount / 100
+        })
+
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not create payment intent.' })
+    }
+})
+
 app.use(express.json())
 
 // Middleware requiring a logged-in customer (any role)
@@ -412,7 +550,37 @@ app.get('/api/admin/customers', verifyAdmin, async (req, res) => {
     }
 })
 
-// Customer fetching own order history
+// Logged-in customer fetching their own order/spending history
+app.get('/api/my-orders', requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                o.id AS order_id,
+                o.created_at,
+                o.total_amount,
+                o.status,
+                json_agg(json_build_object(
+                    'product_name', oi.product_name,
+                    'color', oi.color,
+                    'size', oi.size,
+                    'quantity', oi.quantity,
+                    'price', oi.price
+                )) AS items
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            WHERE o.user_id = $1
+            GROUP BY o.id
+            ORDER BY o.created_at DESC
+        `,
+        [req.user.id])
+        res.json(result.rows)
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not fetch your orders.' })
+    }
+})
+
+// Customer order history (admin view of a specific customer)
 app.get('/api/admin/customers/:id/orders', verifyAdmin, async (req, res) => {
     const { id } = req.params
 
@@ -441,6 +609,37 @@ app.get('/api/admin/customers/:id/orders', verifyAdmin, async (req, res) => {
     } catch (err) {
         console.error(err)
         res.status(500).json({ error: 'Could not fetch orders.' })
+    }
+})
+
+// Registered members requesting a private atelier fitting
+app.post('/api/atelier', requireAuth, async (req, res) => {
+    const { productName, cut, color, notes } = req.body
+
+    try {
+        const userResult = await pool.query(
+            'SELECT full_name, email, phone FROM users WHERE id = $1',
+            [req.user.id]
+        )
+
+        if (userResult.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid or expired token.' })
+        }
+
+        const { full_name, email, phone } = userResult.rows[0]
+
+        const result = await pool.query(
+            `INSERT INTO atelier_appointments
+             (user_id, full_name, email, phone, product_name, cut, color, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING *`,
+            [req.user.id, full_name, email, phone, productName || null, cut || null, color || null, notes || null]
+        )
+
+        res.status(201).json(result.rows[0])
+    } catch (err) {
+        console.error(err)
+        res.status(500).json({ error: 'Could not submit your fitting request.' })
     }
 })
 

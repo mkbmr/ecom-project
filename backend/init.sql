@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTSatelier_appointments (
+CREATE TABLE IF NOT EXISTS atelier_appointments (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
   full_name VARCHAR(255) NOT NULL,
