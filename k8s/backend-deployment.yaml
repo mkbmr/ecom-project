@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maison-aura-backend
+  namespace: maison-aura
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: maison-aura-backend
+  template:
+    metadata:
+      labels:
+        app: maison-aura-backend
+    spec:
+      containers:
+        - name: backend
+          image: maisonauraacr2.azurecr.io/maison-aura-backend:v1
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: DB_NAME
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: JWT_SECRET
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: STRIPE_SECRET_KEY
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+            - name: CORS_ORIGIN
+              valueFrom:
+                secretKeyRef:
+                  name: maison-aura-secrets
+                  key: CORS_ORIGIN
+            - name: PORT
+              value: "5000"
+            - name: NODE_ENV
+              value: "production"

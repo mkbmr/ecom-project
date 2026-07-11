@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maison-aura-frontend
+  namespace: maison-aura
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: maison-aura-frontend
+  template:
+    metadata:
+      labels:
+        app: maison-aura-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: maisonauraacr2.azurecr.io/maison-aura-frontend:v1
+          ports:
+            - containerPort: 80
