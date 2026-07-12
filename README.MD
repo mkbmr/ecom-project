@@ -15,6 +15,7 @@ A full-stack luxury e-commerce platform built from scratch — React storefront,
 | Auth | JWT (jsonwebtoken), bcrypt |
 | Containerisation | Docker, Docker Compose, nginx (frontend serving + API proxy) |
 | Cloud | Azure Kubernetes Service, Azure Container Registry, Azure Database for PostgreSQL |
+| CI/CD | GitHub Actions (lint → build & push to ACR → deploy to AKS) |
 | Styling | CSS (component-scoped), Google Fonts (Cinzel, Playfair Display) |
 
 ---
@@ -185,13 +186,83 @@ kubectl logs deploy/stripe-cli    # "Ready! ... forwarding to http://backend:500
 curl http://<external-ip>/api/products
 ```
 
-### Cost saving between demos
+---
+
+## CI/CD (GitHub Actions)
+
+Every push to `main` (except markdown-only changes) runs `.github/workflows/ci-cd.yml`:
+
+```
+push to main ──▶ lint ──▶ build-and-push ──▶ deploy
+                  │            │                 │
+                  │            │                 └─ az aks get-credentials
+                  │            │                    kubectl apply -f k8s/
+                  │            │                    kubectl set image (new SHA tag)
+                  │            │                    kubectl rollout status
+                  │            └─ az acr login → docker build & push
+                  │               backend:<sha> and frontend:<sha>
+                  └─ eslint (frontend) + node --check (backend)
+```
+
+**Image tagging** — images are tagged with the git commit SHA (`${{ github.sha }}`), not `v1`/`v2`. The tag is immutable and traceable back to the exact commit, and a new tag on every run guarantees `kubectl set image` actually triggers a rollout (reusing a tag like `latest` would be a no-op).
+
+**Authentication** — the workflow logs in with a service principal (`maisonaura-github-cicd`) scoped to least privilege:
+
+| Role | Scope |
+|---|---|
+| `AcrPush` | the ACR only |
+| `Azure Kubernetes Service Cluster User Role` | the AKS cluster only |
+
+One-time setup:
 
 ```bash
+# create the SP and grant only what the pipeline needs
+az ad sp create-for-rbac --name maisonaura-github-cicd --json-auth \
+  --role AcrPush \
+  --scopes $(az acr show -n maisonauraacr2 --query id -o tsv)
+az role assignment create \
+  --assignee <clientId> \
+  --role "Azure Kubernetes Service Cluster User Role" \
+  --scope $(az aks show -g maisonaura-rg2 -n maisonaura2-aks --query id -o tsv)
+```
+
+Save the full JSON output (`clientId`, `clientSecret`, `subscriptionId`, `tenantId`) as a GitHub **repository secret** named `AZURE_CREDENTIALS` (Settings → Secrets and variables → Actions). If the secret is missing or misnamed, `azure/login` fails with *"Ensure 'client-id' and 'tenant-id' are supplied"* — GitHub injects an empty string for unknown secrets rather than erroring.
+
+---
+
+## Pausing & Starting the Cluster (cost saving)
+
+The two billable always-on resources are the AKS node and the Postgres server. Stop both between demos:
+
+```bash
+# stop (order doesn't matter)
 az aks stop -g maisonaura-rg2 -n maisonaura2-aks
 az postgres flexible-server stop -g maisonaura-rg2 -n maison-pg
-# ...and start again before a demo (LoadBalancer IP may change)
+
+# start again before a demo (~3–5 min each)
+az postgres flexible-server start -g maisonaura-rg2 -n maison-pg
+az aks start -g maisonaura-rg2 -n maisonaura2-aks
+
+# verify
+az aks show -g maisonaura-rg2 -n maisonaura2-aks --query powerState.code -o tsv   # Running
+kubectl get pods                                                                    # all Running
+kubectl get svc frontend                                                            # note EXTERNAL-IP
 ```
+
+Notes:
+- The frontend **LoadBalancer IP may change** after a restart — re-check `kubectl get svc frontend` and update `CORS_ORIGIN` in `app-secret` if it did.
+- A stopped Postgres flexible server **auto-starts after 7 days** (Azure policy) — stop it again if you're pausing longer.
+- Stopped AKS still bills for disks and the ACR (Basic ≈ $0.17/day); compute charges stop.
+
+---
+
+## Future Improvements
+
+- **Monitoring & observability** — enable AKS Container Insights (`az aks enable-addons -a monitoring`) for pod/node metrics and logs in Log Analytics; longer-term, Prometheus + Grafana (Azure Managed Prometheus) with alerts on pod restarts, 5xx rates, and Postgres connections.
+- **Cost management** — create an Azure Budget with email alerts (`az consumption budget`), review Cost Analysis weekly, and tag resources (`project=maisonaura`) so spend is attributable. Automate the stop/start schedule above with a cron-triggered GitHub Actions workflow.
+- **TLS + ingress** — replace the LoadBalancer service with an ingress controller + cert-manager for HTTPS.
+- **DB hardening** — restrict the Postgres firewall to the AKS egress IP instead of allow-all.
+- **Automated secrets injection** — replace the manual `kubectl create secret` steps with Azure Key Vault + the Secrets Store CSI driver (addon already enabled on the cluster): a `SecretProviderClass` syncs vault secrets into the existing K8s Secrets, so deployments need no changes. Gotcha to handle: env-var secrets require a pod restart on rotation — only mounted files update live.
 
 ---
 
