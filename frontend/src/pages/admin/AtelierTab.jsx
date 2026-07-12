@@ -9,9 +9,9 @@ function AtelierTab() {
     const [managingId, setManagingId] = useState(null)
     const [manageForm, setManageForm] = useState({ status: '', admin_message: '' })
 
+    // Callers that refetch after a mutation reset loading/error themselves —
+    // setState here would run synchronously inside the mount effect
     const fetchAppointments = async () => {
-        setAppointmentsLoading(true)
-        setAppointmentsError('')
         try {
             const res = await fetch(`${API_URL}/api/atelier`, {
                 headers: {
@@ -64,6 +64,8 @@ function AtelierTab() {
             }
 
             setManagingId(null)
+            setAppointmentsLoading(true)
+            setAppointmentsError('')
             fetchAppointments()
         } catch (err) {
             console.error(err)

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: maisonauraacr2.azurecr.io/backend:v1
+          ports:
+            - containerPort: 5000   # server.js listens on PORT || 5000
+          env:
+            - name: NODE_ENV
+              value: production   # db.js enables SSL only in production — Azure PG requires it
+          envFrom:
+            - secretRef:
+                name: db-secret      # DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
+            - secretRef:
+                name: app-secret     # JWT_SECRET, CORS_ORIGIN
+            - secretRef:
+                name: stripe-secret  # STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend   # nginx in the frontend pod proxies to http://backend:5000
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP

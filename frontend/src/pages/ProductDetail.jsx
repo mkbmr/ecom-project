@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { useCart } from './CartContext'
+import { useCart } from './useCart'
 
 const MEASUREMENTS = {
     men: {

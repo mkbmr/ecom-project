@@ -17,7 +17,7 @@ function AdminDashboard() {
         if (!user || user.role !== 'admin') {
             navigate('/login?message=You must be logged in as an admin.')
         }
-    }, [])
+    }, [navigate])
 
     const handleLogout = () => {
         localStorage.removeItem('user')

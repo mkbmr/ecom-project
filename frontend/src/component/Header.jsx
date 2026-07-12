@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from './Logo'
-import { useCart } from '../pages/CartContext'
+import { useCart } from '../pages/useCart'
 
 function Header() {
     const { cartCount, setIsCartOpen, clearCart } = useCart()

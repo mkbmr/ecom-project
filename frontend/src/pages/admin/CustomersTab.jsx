@@ -9,7 +9,6 @@ function CustomersTab() {
     const [customerOrders, setCustomerOrders] = useState([])
 
     const fetchCustomers = async () => {
-        setCustomersLoading(true)
         try {
             const res = await fetch(`${API_URL}/api/admin/customers`, {
                 headers: {

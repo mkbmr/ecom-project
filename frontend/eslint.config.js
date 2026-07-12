@@ -17,5 +17,10 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Flags the standard fetch-on-mount pattern even when setState only
+      // happens after await; keep as a warning until the rule matures
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

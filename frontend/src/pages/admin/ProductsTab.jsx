@@ -17,8 +17,9 @@ function ProductsTab() {
     const [variants, setVariants] = useState([])
     const [newVariant, setNewVariant] = useState({ color: '', size: '', stock: '' })
 
+    // Callers that refetch after a mutation set loading themselves —
+    // setState here would run synchronously inside the mount effect
     const fetchProducts = async () => {
-        setLoading(true)
         try {
             const res = await fetch(`${API_URL}/api/products`)
             const data = await res.json()
@@ -86,6 +87,7 @@ function ProductsTab() {
             setShowAddForm(false)
             setEditingId(null)
             setFormData({ product: '', descriptions: '', sku: '', category: 'male', type: '', price: '', image: '', stock: '' })
+            setLoading(true)
             fetchProducts()
 
         } catch (err) {
@@ -111,6 +113,7 @@ function ProductsTab() {
                 return
             }
 
+            setLoading(true)
             fetchProducts()
         } catch (err) {
             console.error(err)
