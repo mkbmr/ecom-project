@@ -12,4 +12,12 @@ const pool = new Pool({
     : false
 })
 
-module.exports = pool
+pool.on("connect", () => {
+  console.log("Connected to the database");
+})
+
+pool.on("error", (err) => {
+  console.error("Database error", err);
+});
+
+module.exports = pool;

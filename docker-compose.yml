@@ -5,10 +5,15 @@ services:
     container_name: maison_aura_backend
     env_file:
       - ./backend/.env
+    environment:
+      # Overrides env_file: inside a container "localhost" is the container
+      # itself — host.docker.internal points back to the host machine where
+      # the local Postgres runs
+      DB_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5000:5000"
-    depends_on:
-      - postgres
     restart: unless-stopped
 
   frontend:
@@ -21,9 +26,9 @@ services:
     restart: unless-stopped
 
   stripe-cli:
-    image: stripe/strip-cli:latest
+    image: stripe/stripe-cli:v1.43.7
     container_name: maison_aura_stripe
-    command: listen --forward-to localhost:5000/api/webhook
+    command: listen --forward-to backend:5000/api/webhook
     environment:
       STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_DEVICE_NAME: maison-aura-local
