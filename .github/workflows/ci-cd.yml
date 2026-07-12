@@ -1,0 +1,89 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '**.MD'
+
+env:
+  ACR_NAME: maisonauraacr2
+  ACR_LOGIN_SERVER: maisonauraacr2.azurecr.io
+  RESOURCE_GROUP: maisonaura-rg2
+  AKS_CLUSTER: maisonaura2-aks
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npx eslint src
+
+      - name: Syntax-check backend
+        working-directory: backend
+        run: |
+          node --check server.js
+          node --check db.js
+
+  build-and-push:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: ACR login
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and push backend
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/backend:${{ github.sha }} ./backend
+          docker push $ACR_LOGIN_SERVER/backend:${{ github.sha }}
+
+      - name: Build and push frontend
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/frontend:${{ github.sha }} ./frontend
+          docker push $ACR_LOGIN_SERVER/frontend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials
+        run: az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER
+
+      - name: Apply manifests
+        run: kubectl apply -f k8s/
+
+      - name: Roll out new images
+        run: |
+          kubectl set image deployment/backend  backend=$ACR_LOGIN_SERVER/backend:${{ github.sha }}
+          kubectl set image deployment/frontend frontend=$ACR_LOGIN_SERVER/frontend:${{ github.sha }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend  --timeout=180s
+          kubectl rollout status deployment/frontend --timeout=180s
