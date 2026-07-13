@@ -75,7 +75,7 @@ jobs:
       # Security gate 2: scan the built images (base OS + everything inside)
       # for HIGH/CRITICAL CVEs. Images are only pushed if the scans pass.
       - name: Trivy scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
           severity: HIGH,CRITICAL
@@ -83,7 +83,7 @@ jobs:
           exit-code: '1'
 
       - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }}
           severity: HIGH,CRITICAL
