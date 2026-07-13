@@ -37,8 +37,23 @@ jobs:
           node --check server.js
           node --check db.js
 
+  # Security gate 1: scan npm dependencies for known CVEs.
+  # Fails the pipeline if anything HIGH or CRITICAL is found.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
   build-and-push:
-    needs: lint
+    needs: [lint, dependency-audit]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,15 +66,35 @@ jobs:
       - name: ACR login
         run: az acr login --name $ACR_NAME
 
-      - name: Build and push backend
-        run: |
-          docker build -t $ACR_LOGIN_SERVER/backend:${{ github.sha }} ./backend
-          docker push $ACR_LOGIN_SERVER/backend:${{ github.sha }}
+      - name: Build backend image
+        run: docker build -t $ACR_LOGIN_SERVER/backend:${{ github.sha }} ./backend
 
-      - name: Build and push frontend
-        run: |
-          docker build -t $ACR_LOGIN_SERVER/frontend:${{ github.sha }} ./frontend
-          docker push $ACR_LOGIN_SERVER/frontend:${{ github.sha }}
+      - name: Build frontend image
+        run: docker build -t $ACR_LOGIN_SERVER/frontend:${{ github.sha }} ./frontend
+
+      # Security gate 2: scan the built images (base OS + everything inside)
+      # for HIGH/CRITICAL CVEs. Images are only pushed if the scans pass.
+      - name: Trivy scan backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Trivy scan frontend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push backend image
+        run: docker push $ACR_LOGIN_SERVER/backend:${{ github.sha }}
+
+      - name: Push frontend image
+        run: docker push $ACR_LOGIN_SERVER/frontend:${{ github.sha }}
 
   deploy:
     needs: build-and-push

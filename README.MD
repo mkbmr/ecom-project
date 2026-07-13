@@ -15,7 +15,7 @@ A full-stack luxury e-commerce platform built from scratch — React storefront,
 | Auth | JWT (jsonwebtoken), bcrypt |
 | Containerisation | Docker, Docker Compose, nginx (frontend serving + API proxy) |
 | Cloud | Azure Kubernetes Service, Azure Container Registry, Azure Database for PostgreSQL |
-| CI/CD | GitHub Actions (lint → build & push to ACR → deploy to AKS) |
+| CI/CD | GitHub Actions (lint + npm audit → build → Trivy scan → push to ACR → deploy to AKS) |
 | Styling | CSS (component-scoped), Google Fonts (Cinzel, Playfair Display) |
 
 ---
@@ -193,16 +193,26 @@ curl http://<external-ip>/api/products
 Every push to `main` (except markdown-only changes) runs `.github/workflows/ci-cd.yml`:
 
 ```
-push to main ──▶ lint ──▶ build-and-push ──▶ deploy
-                  │            │                 │
-                  │            │                 └─ az aks get-credentials
-                  │            │                    kubectl apply -f k8s/
-                  │            │                    kubectl set image (new SHA tag)
-                  │            │                    kubectl rollout status
-                  │            └─ az acr login → docker build & push
-                  │               backend:<sha> and frontend:<sha>
+push to main ──▶ lint ─────────────┐
+                  │                ├──▶ build-and-push ──▶ deploy
+             dependency-audit ─────┘         │                │
+                  │                          │                └─ az aks get-credentials
+                  │                          │                   kubectl apply -f k8s/
+                  │                          │                   kubectl set image (new SHA tag)
+                  │                          │                   kubectl rollout status
+                  │                          └─ az acr login
+                  │                             docker build backend:<sha> and frontend:<sha>
+                  │                             Trivy scan both images (HIGH/CRITICAL → fail)
+                  │                             docker push (only if scans pass)
                   └─ eslint (frontend) + node --check (backend)
 ```
+
+**Security gates** — the pipeline blocks deployment on HIGH or CRITICAL CVEs at two layers:
+
+1. **`npm audit`** (dependency-audit job) — scans the app's npm dependency tree against known advisories; backend is scanned with `--omit=dev` (only what ships in the image).
+2. **Trivy** (build-and-push job) — scans the *built Docker images*, including the base OS layer, after `docker build` and before `docker push`, so a vulnerable image never reaches ACR. `ignore-unfixed: true` skips CVEs with no released patch (unactionable); if a fixed CVE ever blocks the pipeline legitimately, add it to a `.trivyignore` with a justification comment rather than removing the gate.
+
+Trivy earned its place immediately: it flagged HIGH CVEs that `npm audit` couldn't see because they lived in the base images, not the app dependencies — a vulnerable `undici` vendored inside the base image's bundled npm (fixed by deleting npm from the final backend image; the runtime only needs `node`), and unpatched Alpine OS packages in `nginx:alpine` (fixed with `apk upgrade --no-cache` in the frontend Dockerfile).
 
 **Image tagging** — images are tagged with the git commit SHA (`${{ github.sha }}`), not `v1`/`v2`. The tag is immutable and traceable back to the exact commit, and a new tag on every run guarantees `kubectl set image` actually triggers a rollout (reusing a tag like `latest` would be a no-op).
 

@@ -13,6 +13,10 @@ RUN npm run build
 # Stage 2: Serve with NGINX
 FROM nginx:alpine
 
+# Apply the latest Alpine security patches — the nginx base image is often
+# a few weeks behind on OS package fixes (this is what Trivy flags)
+RUN apk upgrade --no-cache
+
 # Install dependencies
 COPY --from=builder /app/dist /usr/share/nginx/html
 
