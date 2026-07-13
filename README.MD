@@ -238,6 +238,11 @@ az role assignment create \
 
 Save the full JSON output (`clientId`, `clientSecret`, `subscriptionId`, `tenantId`) as a GitHub **repository secret** named `AZURE_CREDENTIALS` (Settings → Secrets and variables → Actions). If the secret is missing or misnamed, `azure/login` fails with *"Ensure 'client-id' and 'tenant-id' are supplied"* — GitHub injects an empty string for unknown secrets rather than erroring.
 
+**Action version pitfalls** (both hit in this project):
+
+- *"Unable to resolve action"* — action tags aren't consistent about the `v` prefix: `aquasecurity/trivy-action@v0.36.0` needs it, some actions don't. Check the repo's Releases page (or `git ls-remote --tags`) before pinning.
+- *"Node.js 20 is deprecated"* warnings — this is about the runtime the **actions themselves** run on inside the runner, not the app's Node version. Fixed by bumping to releases that target Node 24: `actions/checkout@v5`, `actions/setup-node@v5`, `azure/login@v3` (same inputs, drop-in upgrades).
+
 ---
 
 ## Pausing & Starting the Cluster (cost saving)
