@@ -2,10 +2,10 @@
 export RESOURCE_GROUP="maisonaura-rg2"
 export LOCATION="southeastasia"
 export ACR_NAME="maisonauraacr2"
-export AKS_CLUSTER="maisonaura-aks"
-export POSTGRES_SERVER="maisonaura-db2"
-export KEYVAULT_NAME="maisonaura-kv2"
-export ENVIRONMENT="maisonaura-env2"
+export AKS_CLUSTER="maisonaura2-aks"
+export POSTGRES_SERVER="maison-pg"
+export KEYVAULT_NAME="maisonaura-kv"
+export KEYVAULT_RG="maisonaura-rg"   # Key Vault lives in the old RG, not $RESOURCE_GROUP
 
 # Dynamic values fetched from Azure
 export ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer --output tsv)

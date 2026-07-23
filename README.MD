@@ -265,9 +265,61 @@ kubectl get svc frontend                                                        
 ```
 
 Notes:
-- The frontend **LoadBalancer IP may change** after a restart — re-check `kubectl get svc frontend` and update `CORS_ORIGIN` in `app-secret` if it did.
+- The frontend keeps the **same external IP across stop/start** — see [Static public IP](#static-public-ip) below.
 - A stopped Postgres flexible server **auto-starts after 7 days** (Azure policy) — stop it again if you're pausing longer.
 - Stopped AKS still bills for disks and the ACR (Basic ≈ $0.17/day); compute charges stop.
+
+### Static public IP
+
+By default, a `LoadBalancer` service gets a *dynamic* public IP from Azure. `az aks stop` deallocates the load balancer, so on the next start Azure hands out a **new IP** — breaking bookmarks, DNS records, Stripe webhook URLs, and the `CORS_ORIGIN` secret every time the cluster is paused.
+
+Fix: a standalone static public IP (`frontend-static-pip`, in the AKS managed resource group) pinned to the service via an annotation in `k8s/frontend-deployment.yaml`:
+
+```yaml
+metadata:
+  annotations:
+    service.beta.kubernetes.io/azure-pip-name: frontend-static-pip
+```
+
+Because the IP is its own Azure resource, it survives cluster stop/start and service recreation. Trade-off: a Standard static IP bills ~US$3.60/month even while the cluster is stopped.
+
+---
+
+## Troubleshooting
+
+### Login fails with "could not connect to server" (CORS)
+
+**Symptom:** site loads, but login/register requests fail; backend logs show `Error: Not allowed by CORS`.
+
+**Cause:** the backend only accepts requests whose `Origin` matches `CORS_ORIGIN` in `app-secret`. If the frontend's external IP ever changes (or the secret still holds an old IP), every browser request is rejected — the frontend reports it as a connection error.
+
+**Fix:**
+
+```bash
+# 1. Confirm the mismatch
+kubectl get svc frontend                                                  # current EXTERNAL-IP
+kubectl get secret app-secret -o jsonpath='{.data.CORS_ORIGIN}' | base64 -d
+
+# 2. Update the secret to the current origin
+kubectl patch secret app-secret -p '{"stringData":{"CORS_ORIGIN":"http://<external-ip>"}}'
+
+# 3. Restart the backend — env-var secrets are only read at pod start
+kubectl rollout restart deploy/backend && kubectl rollout status deploy/backend
+
+# 4. Verify: expect 401 (bad creds) with the allow-origin header echoed back, not a CORS error
+curl -X POST http://<external-ip>/api/login \
+  -H 'Content-Type: application/json' -H 'Origin: http://<external-ip>' \
+  -d '{"email":"x@x.com","password":"x"}' \
+  -w '\nHTTP %{http_code} | %header{access-control-allow-origin}\n'
+```
+
+### `kubectl` fails with `no such host` right after `az aks start`
+
+The API server's DNS record takes a few minutes to propagate after a start — this is a DNS delay, not a kubeconfig or auth problem. Wait 2–5 minutes and retry:
+
+```bash
+until kubectl get nodes >/dev/null 2>&1; do sleep 10; done; kubectl get nodes
+```
 
 ---
 

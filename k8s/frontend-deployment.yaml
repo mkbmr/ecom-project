@@ -31,6 +31,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  annotations:
+    # static public IP (4.193.250.95) in the AKS managed RG — survives cluster stop/start
+    service.beta.kubernetes.io/azure-pip-name: frontend-static-pip
 spec:
   selector:
     app: frontend
