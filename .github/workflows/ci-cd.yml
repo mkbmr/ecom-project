@@ -70,7 +70,10 @@ jobs:
         run: docker build -t $ACR_LOGIN_SERVER/backend:${{ github.sha }} ./backend
 
       - name: Build frontend image
-        run: docker build -t $ACR_LOGIN_SERVER/frontend:${{ github.sha }} ./frontend
+        run: |
+          docker build \
+            --build-arg VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }} \
+            -t $ACR_LOGIN_SERVER/frontend:${{ github.sha }} ./frontend
 
       # Security gate 2: scan the built images (base OS + everything inside)
       # for HIGH/CRITICAL CVEs. Images are only pushed if the scans pass.

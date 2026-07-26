@@ -8,6 +8,14 @@ RUN npm install
 
 # Copy in the source code
 COPY . .
+
+# Vite bakes these into the JS bundle at build time — VITE_API_URL stays
+# empty since nginx.conf proxies /api/ to the backend on the same origin.
+ARG VITE_API_URL=""
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_STRIPE_PUBLISHABLE_KEY=$VITE_STRIPE_PUBLISHABLE_KEY
+
 RUN npm run build
 
 # Stage 2: Serve with NGINX
