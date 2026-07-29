@@ -313,6 +313,33 @@ curl -X POST http://<external-ip>/api/login \
   -w '\nHTTP %{http_code} | %header{access-control-allow-origin}\n'
 ```
 
+### Adding a product in Admin dashboard fails (`api/products:1` 500 error)
+
+**Symptom:** Admin → Products → Add Product fails; browser console shows `api/products:1  Failed to load resource: the server responded with a status of 500`. Backend logs show:
+
+```
+error: column "stock" of relation "products" does not exist
+```
+
+**Cause:** schema drift between `backend/init.sql` and the live Azure Postgres database. `init.sql` defines `products.stock INTEGER DEFAULT 0`, but `init.sql` only runs on first container init against a fresh DB — it doesn't retroactively `ALTER` a table that was created before the `stock` column was added (e.g. an older `pg_dump`/restore during the "Migrate data & deploy" step).
+
+**Fix:**
+
+```bash
+psql "host=maison-pg.postgres.database.azure.com user=postgres dbname=maison_aura sslmode=require" \
+  -c "ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT 0;"
+```
+
+**Verify:**
+
+```bash
+psql "host=maison-pg.postgres.database.azure.com user=postgres dbname=maison_aura sslmode=require" -c "\d products"
+# confirm "stock" is listed, then retry adding a product and tail logs:
+kubectl logs -f deploy/backend
+```
+
+There's currently no migration tooling in this project — any future schema change to `init.sql` needs the same manual `ALTER` against the live DB.
+
 ### `kubectl` fails with `no such host` right after `az aks start`
 
 The API server's DNS record takes a few minutes to propagate after a start — this is a DNS delay, not a kubeconfig or auth problem. Wait 2–5 minutes and retry:
