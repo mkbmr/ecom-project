@@ -64,6 +64,11 @@ ecom-project/
     backend-deployment.yaml    # Deployment + ClusterIP Service :5000
     frontend-deployment.yaml   # Deployment + LoadBalancer Service :80
     stripe-deployment.yaml     # stripe-cli webhook forwarder
+    secret-provider-class.yaml # syncs Key Vault secrets into K8s Secrets (CSI driver)
+  terraform/
+    main.tf                    # ACR, AKS, Key Vault, access policies, KV secrets
+    variables.tf / outputs.tf / providers.tf
+    terraform.tfvars           # actual values incl. secrets — gitignored
   docker-compose.yml
 ```
 
@@ -146,26 +151,16 @@ docker build -t maisonauraacr2.azurecr.io/frontend:v1 ./frontend && docker push 
 
 ### 3. Secrets
 
-The backend reads individual `DB_*` variables (not a connection string) plus JWT and Stripe keys:
+The backend reads individual `DB_*` variables (not a connection string) plus JWT and Stripe keys. These are provisioned in Azure Key Vault by Terraform (see [Infrastructure as Code](#infrastructure-as-code-terraform) below) and synced into the cluster automatically by the Secrets Store CSI driver — no manual `kubectl create secret` needed:
 
 ```bash
 az aks get-credentials -g maisonaura-rg2 -n maisonaura2-aks
 
-kubectl create secret generic db-secret \
-  --from-literal=DB_USER=postgres \
-  --from-literal=DB_PASSWORD='<password>' \
-  --from-literal=DB_HOST=maison-pg.postgres.database.azure.com \
-  --from-literal=DB_PORT=5432 \
-  --from-literal=DB_NAME=maison_aura
-
-kubectl create secret generic app-secret \
-  --from-literal=JWT_SECRET='<random-string>' \
-  --from-literal=CORS_ORIGIN='http://<frontend-external-ip>'
-
-kubectl create secret generic stripe-secret \
-  --from-literal=STRIPE_SECRET_KEY='sk_test_...' \
-  --from-literal=STRIPE_WEBHOOK_SECRET='whsec_...'
+kubectl apply -f k8s/secret-provider-class.yaml   # defines the KV → K8s Secret sync
+kubectl apply -f k8s/backend-deployment.yaml       # mounting the SecretProviderClass triggers the sync
 ```
+
+The `SecretProviderClass` (`k8s/secret-provider-class.yaml`) pulls all Key Vault secrets and syncs them into K8s Secrets named `db-secret`, `app-secret`, `stripe-secret` — the exact names the deployment's `secretRef` blocks already expect, so no application config changed when this replaced the old manual-secret workflow.
 
 ### 4. Migrate data & deploy
 
@@ -185,6 +180,38 @@ kubectl get pods                  # backend, frontend, stripe-cli all Running
 kubectl logs deploy/stripe-cli    # "Ready! ... forwarding to http://backend:5000/api/webhook"
 curl http://<external-ip>/api/products
 ```
+
+---
+
+## Infrastructure as Code (Terraform)
+
+`terraform/` manages the core Azure infra as code: ACR, AKS (with the Key Vault Secrets Provider / Secrets Store CSI addon enabled), Key Vault, its access policies, and all application secrets. Resource Group and PostgreSQL are managed outside Terraform (RG referenced as a `data` source; Postgres provisioned via `az` in step 1 above).
+
+```
+terraform/
+  main.tf              # ACR, AKS, Key Vault, access policies, KV secrets
+  variables.tf          # input declarations (no values — see terraform.tfvars)
+  outputs.tf             # ACR login server, AKS host, KV URI, CSI identity client ID
+  providers.tf            # azurerm provider config
+  terraform.tfvars         # actual values incl. secrets — gitignored, never committed
+```
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+**Note:** `terraform.tfvars`, `*.tfstate*`, and `.terraform/` are all gitignored — secrets never reach the repo. State is local-only in this setup (no remote backend).
+
+### Terraform gotchas hit standing this up
+
+- **Sensitive `for_each`** — Terraform refuses a `sensitive = true` variable as `for_each` keys. Fix: `for_each = toset(nonsensitive(keys(var.kv_secrets)))`, then look up the actual value from the still-sensitive map (`var.kv_secrets[each.value]`) so secret values stay redacted in plan output.
+- **Immutable AKS attributes force full cluster replacement** — `dns_prefix`, `default_node_pool.name`, `network_profile.network_plugin_mode`, and `linux_profile` (SSH key) must match the *real* live cluster exactly, or Terraform plans a destroy+recreate instead of an update. Same for `oidc_issuer_enabled` — Azure rejects trying to disable it once set (`OIDCIssuerFeatureCannotBeDisabled`), so it must be explicitly declared `true` if already enabled.
+- **`resourceGroups` casing** — `az ... --query id -o tsv` sometimes returns lowercase `resourcegroups`, but azurerm's resource ID parser requires canonical `resourceGroups`. Build import IDs from `az group show --query id` (correct casing) rather than trusting other commands' casing verbatim.
+- **Don't mix inline `access_policy` blocks with standalone `azurerm_key_vault_access_policy` resources** — using both on the same vault causes a permanent flapping diff (each fights to control the vault's policy list). Use standalone `azurerm_key_vault_access_policy` resources exclusively.
+- **Resources that already exist in Azure need `terraform import`, not `apply`** — hit this for the AKS→ACR `AcrPull` role assignment and the runner's KV access policy (`RoleAssignmentExists` / "already exists ... needs to be imported"). Always run `terraform plan` and check for **0 to destroy** before ever applying.
 
 ---
 
@@ -356,7 +383,7 @@ until kubectl get nodes >/dev/null 2>&1; do sleep 10; done; kubectl get nodes
 - **Cost management** — create an Azure Budget with email alerts (`az consumption budget`), review Cost Analysis weekly, and tag resources (`project=maisonaura`) so spend is attributable. Automate the stop/start schedule above with a cron-triggered GitHub Actions workflow.
 - **TLS + ingress** — replace the LoadBalancer service with an ingress controller + cert-manager for HTTPS.
 - **DB hardening** — restrict the Postgres firewall to the AKS egress IP instead of allow-all.
-- **Automated secrets injection** — replace the manual `kubectl create secret` steps with Azure Key Vault + the Secrets Store CSI driver (addon already enabled on the cluster): a `SecretProviderClass` syncs vault secrets into the existing K8s Secrets, so deployments need no changes. Gotcha to handle: env-var secrets require a pod restart on rotation — only mounted files update live.
+- ~~**Automated secrets injection**~~ — done: Azure Key Vault + Terraform (`terraform/`) + the Secrets Store CSI driver (`k8s/secret-provider-class.yaml`) now sync vault secrets into the existing K8s Secrets, replacing manual `kubectl create secret`. Remaining gotcha: env-var secrets require a pod restart on rotation — only mounted files (`/mnt/secrets-store`) update live.
 
 ---
 
